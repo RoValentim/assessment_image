@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<title>IceShop Assessment</title>
+		<style>
+			input:invalid { background-color: lightPink;}
+			input:valid { background-color:lightGreen; }
+			input:required {border: 2px solid red;}
+			input:optional {border: 2px solid green;}
+			fieldset {
+				border:1px solid;
+				padding:20px;
+			}
+			.formLabel { display: inline-block; width: 140px; text-align: right; } 
+			#uploadFileMultiple
+			{
+				display: block;
+				font-weight: bold;
+				text-align: center;
+				padding: 1em 0;
+				margin: 1em 0;
+				color: #555;
+				border: 2px dashed #555;
+				border-radius: 7px;
+				cursor: default;
+				width: 740px;
+			}
+			#uploadFileMultiple.hover
+			{
+				color: #f00;
+				border-color: #f00;
+				border-style: solid;
+				box-shadow: inset 0 3px 4px #888;
+			}
+			img
+			{
+				max-width: 100%;
+			}xplor
+			pre
+			{
+				width: 95%;
+				height: 8em;
+				font-family: monospace;
+				font-size: 0.9em;
+				padding: 1px 2px;
+				margin: 0 0 1em auto;
+				border: 1px inset #666;
+				background-color: #eee;
+				overflow: auto;
+			}
+			#messages
+			{
+				padding: 0 10px;
+				margin: 1em 0;
+				border: 1px solid #999;
+			}
+		</style>
+	</head>
+	<body>
+		<fieldset>
+			<form id="uploadJSON">
+				<legend>Upload a file as Base64 and JSON</legend>
+				<label for="uploadClientId" class="formLabel">Client ID:</label>
+				<input type="text" id="uploadClientId" pattern="[a-zA-Z0-9_]{1,16}" placeholder="letters and numbers  and underscore only" required/> <br/>
+				<label for="uploadFile" class="formLabel">Select a file:</label>
+				<input id="uploadFile" type="file" required/> <br/>
+
+				<button>Submit form</button><br />
+			</form>
+			<textarea id="uploadResult" rows="5" cols="100" disabled>
+			</textarea>
+		</fieldset>
+		<fieldset>
+			<form enctype="multipart/form-data" id="uploadMultiple" name="uploadMultiple" method="post" action="http://localhost:8000/upload-image">
+				<legend>Upload multiple files as WebForm</legend>
+				<label for="uploadClientIdMultiple" class="formLabel">Client ID:</label>
+				<input type="text" id="uploadClientIdMultiple" pattern="[a-zA-Z0-9_]{1,16}" placeholder="letters and numbers  and underscore only" required/> <br/>
+				<input type="hidden" name="MAX_FILE_SIZE" value="5242880" />
+				<input id="uploadFileMultiple" multiple name="uploadFileMultiple[]" type="file" class="formLabel" required/> <br/>
+				<div id="message"></div> <br />
+
+				<button>Submit form</button><br />
+			</form>
+			<textarea id="uploadResultMultiple" rows="5" cols="100" disabled>
+			</textarea>
+		</fieldset>
+		<fieldset>
+			<form id="search">
+				<legend>Search for a file</legend>
+				<label for="searchClientId" class="formLabel">Client ID:</label>
+				<input type="text" id="searchClientId" pattern="[a-zA-Z0-9_]{1,16}" placeholder="letters and numbers  and underscore only" required/> <br/>
+				<label for="searchPattern" class="formLabel">Pattern :</label>
+				<input type="text" id="searchPattern" pattern="[a-zA-Z0-9]{1,100}" placeholder="letters and numbers only" required/>
+				<br>
+				<button id="searchSubmit">Submit form</button><br />
+			</form>
+			<textarea id="searchResult" rows="5" cols="100" disabled>
+			</textarea>
+		</fieldset>
+	</body>
+	<script>
+		var memFiles = new Array();
+
+		var UrlSearchImage = window.location.origin + "/search-image";
+		var UrlUploadImage = window.location.origin + "/upload-image";
+
+		var formSearch = document.getElementById("search");
+		var formUpload = document.getElementById("uploadJSON");
+		var formUploadMultiple = document.getElementById("uploadMultiple");
+
+		var searchClientId = document.getElementById("searchClientId");
+		var searchPattern = document.getElementById("searchPattern");
+		var searchResult = document.getElementById("searchResult");
+		var searchSubmit = document.getElementById("searchSubmit");
+
+		var uploadClientId = document.getElementById("uploadClientId");
+		var uploadFile = document.getElementById("uploadFile");
+		var uploadResult = document.getElementById("uploadResult");
+		var uploadSubmit = document.getElementById("uploadMultiple");
+
+		var uploadClientIdMultiple = document.getElementById("uploadClientIdMultiple");
+		var uploadFileMultiple = document.getElementById("uploadFileMultiple");
+		var uploadResultMultiple = document.getElementById("uploadResultMultiple");
+		var uploadSubmitMultiple = document.getElementById("uploadJSON");
+
+		document.onreadystatechange = function( e ) {
+			if( document.readyState !== "interactive" )
+				return;
+		}
+
+		function checkFile(file, msg) {
+			var fileExtension = "";
+			var allowedExtensions = ["jpe", "jpeg", "jpg", "jtif", "png", "gif", "bmp"];
+
+			if( file.size > 5242880) {
+				msg.innerHTML = "File " + file.name + " is too big";
+				return false;
+			}
+
+			if( file.name.lastIndexOf(".") > 0 ) {
+				fileExtension = file.name.substring(file.name.lastIndexOf(".") + 1, file.name.length);
+			}
+
+			if( allowedExtensions.indexOf(fileExtension) == -1 ) {
+				msg.innerHTML = "File type not allowed for " + file.name;
+				return false;
+			}
+
+			return true;
+		}
+
+		formSearch.addEventListener( 'submit', function( e ) {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+
+			return false;
+		});
+
+		formUpload.addEventListener( 'submit', function( e ) {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+
+			return false;
+		});
+
+		searchSubmit.addEventListener( 'click', function( e ) {
+			if(!formSearch.checkValidity()) {
+				return false;
+			}
+
+			var xhr = new XMLHttpRequest();
+
+			xhr.addEventListener( "loadend", function() {
+				if( xhr.status != 200 ) {
+					console.log( "Error: [" + xhr.status + "] " + xhr.statusText );
+					return;
+				}
+
+				searchResult.innerHTML = xhr.response;
+			});
+
+			xhr.open('POST', UrlSearchImage);
+
+			var form = new FormData();
+			form.append('clientId', searchClientId.value);
+			form.append('search', searchPattern.value);
+
+			var object = {};
+			form.forEach((value, key) => {object[key] = value});
+			var json = JSON.stringify(object);
+
+			xhr.send(json);
+		});
+
+		uploadSubmit.addEventListener( 'click', function( e ) {
+			if(!formUpload.checkValidity()) {
+				return false;
+			}
+
+			var xhr = new XMLHttpRequest();
+
+			xhr.addEventListener( "loadend", function() {
+				if( xhr.status != 200 ) {
+					console.log( "Error: [" + xhr.status + "] " + xhr.statusText );
+					return;
+				}
+
+				uploadResult.innerHTML = xhr.response;
+			});
+
+			xhr.open('POST', UrlUploadImage);
+
+			var file = uploadFile.files[0];
+			var reader = new FileReader();
+
+			if( !checkFile(file, uploadResult) ) {
+				return;
+			}
+
+			reader.addEventListener("load", function () {
+				var fileBase64 = reader.result;
+
+				var json = '{ "clientId": "' + uploadClientId.value + '", "images": [{ "originalName": "' + file.name + '", "base64": "' + fileBase64 + '"}]}';
+				xhr.send(json);
+			}, false);
+
+			if (file) {
+				reader.readAsDataURL(file);
+			}
+		});
+
+		function uploadOneFile(file, indice) {
+//formUploadMultiple.submit();
+			var xhr = new XMLHttpRequest();
+			xhr.onreadystatechange = function() 
+			{ 
+				if(xhr.readyState == 4) 
+				{ 
+					if(xhr.status == 200) 
+					{
+						uploadResultMultiple.innerHTML = xhr.responseText;
+					}
+				}
+			}; 
+
+			xhr.open('POST', 'http://localhost:8000/upload-image');
+
+			// looks like PHP / Apache should automatically translate
+			// header X_FILENAME in HTTTP-X-FILENAME which is the correct header
+			// in some case they don't do that so let's write it a clean way
+			xhr.setRequestHeader("X-FILENAME", file.name);
+//			xhr.setRequestHeader("X-CLIENT-ID", uploadClientIdMultiple.value);
+
+			var progressBar = document.getElementById("progressBar"+indice);
+
+			xhr.upload.onprogress = function(e)  {
+				progressBar.value = e.loaded;
+				progressBar.max = e.total;
+			};
+
+			var formData = new FormData();
+			formData.append("thefile", file);
+			xhr.send(formData);
+//			xhr.send(file);
+		}
+
+		progressBar = function (event) {
+			if(event) {
+				event.preventDefault(); 
+			}
+
+			if(!formUploadMultiple.checkValidity()) {
+				return false;
+			}
+
+			var files = uploadFileMultiple.files;
+
+			nbUploadedFiles = document.querySelectorAll("#message li").length;
+
+			for(i=0; i<files.length; i++) {
+				if( !checkFile(files[i], uploadResultMultiple) ) {
+					continue;
+				}
+				var li = document.createElement('li');
+				li.textContent = files[i].name + " ";
+				var progressBar = document.createElement('progress');
+				progressBar.id = "progressBar"+(nbUploadedFiles+i);
+				progressBar.value = 0;
+				progressBar.max = 100;
+				li.appendChild(progressBar);
+				document.getElementById("message").appendChild(li);
+				uploadOneFile(files[i], (nbUploadedFiles+i));
+			}
+		}
+
+		formUploadMultiple.onsubmit = progressBar;
+	</script>
+</html>
